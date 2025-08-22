@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>人名牌制作器</title>
+    <!-- 添加jsPDF和html2canvas库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            margin: 0 auto;
+            overflow-x: auto;
+        }
+        .left-panel {
+            width: 400px;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .right-panel {
+            flex: 1;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            min-width: 0;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .input-section {
+            margin-bottom: 25px;
+        }
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #555;
+        }
+        textarea {
+            width: 90%;
+            height: 150px;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            resize: vertical;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        .generate-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.3s;
+        }
+        .generate-btn:hover {
+            background-color: #0056b3;
+        }
+        .name-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        .name-card {
+            background-image: url('./js/manager.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            color: white;
+            padding: 0;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            width: 100%;
+            aspect-ratio: 1 / 1.414;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .name-card-upper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: rotate(180deg);
+            padding: 20px 20px;
+            font-size:16cqw;
+            color: white;
+        }
+        .name-card-lower {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 20px;
+            font-size: 16cqw;
+            color: white;
+        }
+        .name-card {
+            container-type: inline-size;
+        }
+        .names-container {
+            position: absolute;
+            top: 15.2%;
+            left: 50%;
+            gap: 22cqw;
+            transform: translate(-50%, 0%);
+            width: 90%;
+            height: 62%;
+            display: flex;
+            flex-direction: column;
+            z-index: 5;
+            container-type: inline-size;
+        }
+        .title-container {
+            height: 25%;
+            /* border: 1px solid; */
+            position: absolute;
+            top: 33%;
+            left: 51%;
+            transform: translate(-50%, 0%);
+            width: 68%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 6;
+            
+        }
+        .title-card-upper {
+            text-align: left;
+            transform: rotate(180deg);
+            font-size: 6cqw;
+            color: white;
+            font-weight: bold;
+           
+            /* transform: translateX(-1%); */
+        }
+        .title-card-lower {
+            text-align: right;
+            font-size: 6cqw;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        .title-upper-box {
+            width: 43%;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            margin-bottom: 5%;
+            margin-left: -2%;
+
+        }
+        .title-lower-box {
+            width: 43%;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            margin-bottom: 4.3%;
+        }
+        .tag-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            justify-content: center;
+        }
+        .tag {
+            padding: 10px 20px;
+            background-color: #e0e0e0;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .tag.active {
+            background-color: #007bff;
+            color: white;
+        }
+        .tag:hover {
+            background-color: #007bff;
+            color: white;
+        }
+        .title-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .title-btn {
+            padding: 6px 12px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #495057;
+            transition: all 0.3s;
+        }
+        .title-btn:hover {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .print-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .print-btn:hover {
+            background-color: #218838;
+        }
+        .print-btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .export-options {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .export-select {
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+        /* 进度提示 */
+        .progress-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .progress-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .progress-bar {
+            width: 300px;
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background-color: #007bff;
+            transition: width 0.3s;
+            width: 0%;
+        }
+        /* A4大小的隐藏容器 */
+        .pdf-container {
+            position: fixed;
+            left: -9999px;
+            width: 794px;
+            height: 1123px;
+            background: white;
+        }
+        .pdf-container .name-card {
+            width: 100%;
+            height: 100%;
+            aspect-ratio: auto;
+        }
+        .pdf-container .name-card-upper,
+        .pdf-container .name-card-lower {
+            font-size: 96px;
+        }
+    </style>
+</head>
+<body>
+    <h1>人名牌制作器</h1>
+    
+    <div class="container">
+        <div class="left-panel">
+            
+            <div class="input-section">
+                <label for="names">请输入名字（用逗号分隔或换行）：</label>
+                <textarea id="names" placeholder="例如：张三,李四,王五&#10;或者每行一个名字" oninput="autoGenerateNameCards()">张三封,李四天,王五,赵六,钱七</textarea>
+            </div>
+            
+            <div class="input-section">
+                <label for="title">课程名称：</label>
+                <input type="text" id="title" placeholder="请输入职位名称" value="企业首席人才官" style="width: 90%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; margin-bottom: 10px;" oninput="autoGenerateNameCards()">
+                <div class="title-options">
+                    <button class="title-btn" onclick="selectTitle('企业首席人才官')">企业首席人才官</button>
+                    <button class="title-btn" onclick="selectTitle('卓越管理者')">卓越管理者</button>
+                    <button class="title-btn" onclick="selectTitle('增长领航官')">增长领航官</button>
+                    <button class="title-btn" onclick="selectTitle('增长战略官')">增长战略官</button>
+                    <button class="title-btn" onclick="selectTitle('CEO增长营')">CEO增长营</button>
+                    <button class="title-btn" onclick="selectTitle('卓越高管')">卓越高管</button>
+                 
+                </div>
+            </div>
+            
+            
+        </div>
+        
+        <div class="right-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: #555;">生成的名字卡片</h3>
+                <div class="export-options">
+                    <select class="export-select" id="exportType">
+                        <option value="combined">合并为一个PDF</option>  
+                        <option value="separate">每张卡片单独PDF</option>
+                        <option value="print">使用打印功能</option>
+                    </select>
+                    <button class="print-btn" onclick="exportPDF()" id="exportBtn">导出为PDF</button>
+                </div>
+            </div>
+            <div id="nameGrid" class="name-grid"></div>
+        </div>
+    </div>
+
+    <!-- 进度提示 -->
+    <div class="progress-overlay" id="progressOverlay">
+        <div class="progress-content">
+            <h3>正在生成PDF，请稍候...</h3>
+            <div class="progress-bar">
+                <div class="progress-bar-fill" id="progressBar"></div>
+            </div>
+            <div id="progressText">0 / 0</div>
+        </div>
+    </div>
+
+    <!-- PDF生成容器 -->
+    <div id="pdfContainer" class="pdf-container"></div>
+
+    <script>
+        let currentTag = 'manager';
+        let generatedNames = [];
+        
+        function selectTitle(title) {
+            const titleInput = document.getElementById('title');
+            titleInput.value = title;
+            titleInput.focus();
+            autoGenerateNameCards(); // 选择标题后自动生成
+        }
+        
+        // 计算字符实际长度：中文字符占2个，英文字符占1个
+        function getCharacterLength(text) {
+            let length = 0;
+            for (let i = 0; i < text.length; i++) {
+                const charCode = text.charCodeAt(i);
+                // 中文字符范围：\u4e00-\u9fff
+                if (charCode >= 0x4e00 && charCode <= 0x9fff) {
+                    length += 2;
+                } else {
+                    length += 1;
+                }
+            }
+            return length;
+        }
+
+        function adjustNameFontSize(nameElement, text) {
+            // 计算实际字符长度
+            const actualLength = getCharacterLength(text);
+            
+            // 基础字体大小为16cqw，2-3个中文字符时使用最大字体
+            let fontSizeCqw = 16;
+            
+            if (actualLength > 6) {
+                // 超过6个字符时，每多2个字符就减少1cqw
+                const extraChars = actualLength - 6;
+                const reduction = Math.floor(extraChars / 2);
+                fontSizeCqw = Math.max(6, 16 - reduction); // 最小不小于6cqw
+            }
+            
+            // 使用cqw单位设置字体大小
+            nameElement.style.setProperty('font-size', fontSizeCqw + 'cqw', 'important');
+            
+            // 添加调试信息
+            console.log(`文字: "${text}", 实际长度: ${actualLength}, cqw: ${fontSizeCqw}`);
+        }
+
+        function adjustTitleBoxFontSize(box, text) {
+            // 获取盒子的实际宽度
+            const boxWidth = box.offsetWidth;
+            
+            // 计算容器宽度（用于cqw单位计算）
+            const containerWidth = box.closest('.name-card').offsetWidth;
+            
+            // 最大字体大小为16cqw，转换为像素值
+            const maxFontSizeCqw = 16;
+            const maxFontSizePx = (maxFontSizeCqw / 100) * containerWidth;
+            
+            // 可用宽度为盒子宽度的80%
+            const availableWidth = boxWidth * 0.8;
+            
+            // 根据文字数量计算合适的字体大小
+            const calculatedFontSize = availableWidth / max(text.length,5);
+            
+            // 取较小值，但不小于12px
+            const fontSize = Math.max(12, Math.min(maxFontSizePx, calculatedFontSize));
+            
+            box.style.fontSize = fontSize + 'px';
+        }
+        function max(a,b) {
+            return a>b? a:b
+        }
+        
+        function switchTag(tagType) {
+            currentTag = tagType;
+            
+            document.querySelectorAll('.tag').forEach(tag => {
+                tag.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            updateCardBackgrounds();
+        }
+        
+        function updateCardBackgrounds() {
+            const nameCards = document.querySelectorAll('.name-card');
+            const backgroundImage = currentTag === 'manager' 
+                ? 'url("./js/manager.png")'
+                : 'url("./js/manager.png")';
+            
+            nameCards.forEach(card => {
+                card.style.backgroundImage = backgroundImage;
+            });
+        }
+        
+        function autoGenerateNameCards() {
+            // 防抖处理，避免频繁生成
+            clearTimeout(autoGenerateNameCards.timeout);
+            autoGenerateNameCards.timeout = setTimeout(generateNameCards, 300);
+        }
+        
+        function generateNameCards() {
+            const namesInput = document.getElementById('names').value;
+            const titleInput = document.getElementById('title').value;
+            const nameGrid = document.getElementById('nameGrid');
+            
+            nameGrid.innerHTML = '';
+            
+            if (!namesInput.trim()) {
+                return; // 如果没有输入，直接返回，不显示警告
+            }
+            
+            let names = namesInput.split(/[,，\n]/).map(name => name.trim()).filter(name => name);
+            
+            if (names.length === 0) {
+                return; // 如果没有有效名字，直接返回，不显示警告
+            }
+            
+            generatedNames = names;
+            
+            const nameCards = names.map(name => {
+                if (name) {
+                    const nameCard = document.createElement('div');
+                    nameCard.className = 'name-card';
+                    nameCard.setAttribute('data-name', name);
+                    nameCard.setAttribute('data-title', titleInput);
+                    
+                    // 创建名字容器
+                    const namesContainer = document.createElement('div');
+                    namesContainer.className = 'names-container';
+                    
+                    const upperPart = document.createElement('div');
+                    upperPart.className = 'name-card-upper';
+                    upperPart.textContent = name;
+                    
+                    const lowerPart = document.createElement('div');
+                    lowerPart.className = 'name-card-lower';
+                    lowerPart.textContent = name;
+                    
+                    namesContainer.appendChild(upperPart);
+                    namesContainer.appendChild(lowerPart);
+                    
+                    nameCard.appendChild(namesContainer);
+                    
+                    // 调整名字字体大小
+                    setTimeout(() => {
+                        adjustNameFontSize(upperPart, name);
+                        adjustNameFontSize(lowerPart, name);
+                    }, 0);
+                    
+                    // 如果有课程名称，创建课程名称容器
+                    if (titleInput.trim()) {
+                        const titleContainer = document.createElement('div');
+                        titleContainer.className = 'title-container';
+                        
+                        const titleUpperPart = document.createElement('div');
+                        titleUpperPart.className = 'title-card-upper';
+                        
+                        const titleUpperBox = document.createElement('div');
+                        titleUpperBox.className = 'title-upper-box';
+                        titleUpperBox.textContent = titleInput;
+                        titleUpperPart.appendChild(titleUpperBox);
+                        
+                        const titleLowerPart = document.createElement('div');
+                        titleLowerPart.className = 'title-card-lower';
+                        
+                        const titleLowerBox = document.createElement('div');
+                        titleLowerBox.className = 'title-lower-box';
+                        titleLowerBox.textContent = titleInput;
+                        titleLowerPart.appendChild(titleLowerBox);
+                        
+                        titleContainer.appendChild(titleUpperPart);
+                        titleContainer.appendChild(titleLowerPart);
+                        nameCard.appendChild(titleContainer);
+                        
+                        // 使用setTimeout确保DOM元素已经渲染后再调整字体大小
+                        setTimeout(() => {
+                            adjustTitleBoxFontSize(titleUpperBox, titleInput);
+                            adjustTitleBoxFontSize(titleLowerBox, titleInput);
+                        }, 0);
+                    }
+                    
+                    return nameCard;
+                }
+            }).filter(card => card);
+            
+            nameCards.forEach(card => {
+                nameGrid.appendChild(card);
+            });
+            
+            updateCardBackgrounds();
+        }
+        
+        async function exportPDF() {
+            const exportType = document.getElementById('exportType').value;
+            const nameCards = document.querySelectorAll('#nameGrid .name-card');
+            
+            if (nameCards.length === 0) {
+                alert('请先生成名字卡片！');
+                return;
+            }
+            
+            if (exportType === 'print') {
+                printNameCards();
+                return;
+            }
+            
+            const exportBtn = document.getElementById('exportBtn');
+            const progressOverlay = document.getElementById('progressOverlay');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            
+            exportBtn.disabled = true;
+            progressOverlay.style.display = 'flex';
+            
+            try {
+                const { jsPDF } = window.jspdf;
+                const pdfContainer = document.getElementById('pdfContainer');
+                
+                if (exportType === 'separate') {
+                    // 为每张卡片生成单独的PDF
+                    for (let i = 0; i < nameCards.length; i++) {
+                        const card = nameCards[i];
+                        const name = card.getAttribute('data-name');
+                        
+                        progressBar.style.width = `${((i + 1) / nameCards.length) * 100}%`;
+                        progressText.textContent = `${i + 1} / ${nameCards.length}`;
+                        
+                        // 清空容器并克隆卡片
+                        pdfContainer.innerHTML = '';
+                        const clonedCard = card.cloneNode(true);
+                        pdfContainer.appendChild(clonedCard);
+                        
+                        // 确保字体大小已正确设置
+                        const titleBoxes = clonedCard.querySelectorAll('.title-upper-box, .title-lower-box');
+                        titleBoxes.forEach(box => {
+                            const text = box.textContent;
+                            if (text) {
+                                // 重新计算字体大小
+                                const boxWidth = box.offsetWidth;
+                                const containerWidth = clonedCard.offsetWidth;
+                                const maxFontSizeCqw = 16;
+                                const maxFontSizePx = (maxFontSizeCqw / 100) * containerWidth;
+                                const availableWidth = boxWidth * 0.8;
+                                const textLength = Math.max(text.length, 5);
+                                const calculatedFontSize = availableWidth / textLength;
+                                const fontSize = Math.max(12, Math.min(maxFontSizePx, calculatedFontSize));
+                                box.style.fontSize = fontSize + 'px';
+                            }
+                        });
+                        
+                        // 等待渲染
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        
+                        // 生成canvas
+                        const canvas = await html2canvas(pdfContainer, {
+                            scale: 2,
+                            useCORS: true,
+                            allowTaint: true,
+                            logging: false
+                        });
+                        
+                        // 创建PDF
+                        const pdf = new jsPDF('p', 'mm', 'a4');
+                        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                        pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+                        
+                        // 下载PDF
+                        pdf.save(`${name}_名牌.pdf`);
+                        
+                        // 添加延迟
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                } else {
+                    // 合并为一个PDF
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    
+                    for (let i = 0; i < nameCards.length; i++) {
+                        const card = nameCards[i];
+                        
+                        progressBar.style.width = `${((i + 1) / nameCards.length) * 100}%`;
+                        progressText.textContent = `${i + 1} / ${nameCards.length}`;
+                        
+                        // 清空容器并克隆卡片
+                        pdfContainer.innerHTML = '';
+                        const clonedCard = card.cloneNode(true);
+                        pdfContainer.appendChild(clonedCard);
+                        
+                        // 确保字体大小已正确设置
+                        const titleBoxes = clonedCard.querySelectorAll('.title-upper-box, .title-lower-box');
+                        titleBoxes.forEach(box => {
+                            const text = box.textContent;
+                            if (text) {
+                                // 重新计算字体大小
+                                const boxWidth = box.offsetWidth;
+                                const containerWidth = clonedCard.offsetWidth;
+                                const maxFontSizeCqw = 16;
+                                const maxFontSizePx = (maxFontSizeCqw / 100) * containerWidth;
+                                const availableWidth = boxWidth * 0.8;
+                                const textLength = Math.max(text.length, 5);
+                                const calculatedFontSize = availableWidth / textLength;
+                                const fontSize = Math.max(12, Math.min(maxFontSizePx, calculatedFontSize));
+                                box.style.fontSize = fontSize + 'px';
+                            }
+                        });
+                        
+                        // 等待渲染
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        
+                        // 生成canvas
+                        const canvas = await html2canvas(pdfContainer, {
+                            scale: 2,
+                            useCORS: true,
+                            allowTaint: true,
+                            logging: false
+                        });
+                        
+                        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                        
+                        if (i > 0) {
+                            pdf.addPage();
+                        }
+                        
+                        pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+                    }
+                    
+                    pdf.save('所有名牌.pdf');
+                }
+                
+                // 显示完成提示
+                // setTimeout(() => {
+                //     alert('PDF导出完成！');
+                // }, 100);
+                
+            } catch (error) {
+                console.error('导出PDF时出错：', error);
+                setTimeout(() => {
+                    alert('导出PDF失败，请重试！错误信息：' + error.message);
+                }, 100);
+            } finally {
+                exportBtn.disabled = false;
+                progressOverlay.style.display = 'none';
+                pdfContainer.innerHTML = '';
+            }
+        }
+        
+        function printNameCards() {
+            const nameCards = document.querySelectorAll('#nameGrid .name-card');
+            if (nameCards.length === 0) {
+                alert('请先生成名字卡片！');
+                return;
+            }
+            
+            const backgroundImage = currentTag === 'manager' 
+                ? 'https://test-biubiubiu.oss-cn-shenzhen.aliyuncs.com/manager.jpg'
+                : 'https://test-biubiubiu.oss-cn-shenzhen.aliyuncs.com/talent.jpg';
+            
+            // 创建打印内容
+            let printContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>打印名牌</title>
+                    <style>
+                        @page {
+                            size: A4;
+                            margin: 0;
+                        }
+                        @media print {
+                            body {
+                                margin: 0;
+                                padding: 0;
+                            }
+                            .page-break {
+                                page-break-after: always;
+                            }
+                        }
+                        body {
+                            margin: 0;
+                            padding: 0;
+                            font-family: Arial, sans-serif;
+                        }
+                        .name-card {
+                            width: 210mm;
+                            height: 297mm;
+                            background-image: url('${backgroundImage}');
+                            background-size: cover;
+                            background-position: center;
+                            background-repeat: no-repeat;
+                            position: relative;
+                            display: flex;
+                            flex-direction: column;
+                            margin: 0;
+                            padding: 0;
+                        }
+                        .names-container {
+                            position: absolute;
+                            top: 15.2%;
+                            left: 50%;
+                            transform: translate(-50%, 0%);
+                            width: 90%;
+                            height: 62%;
+                            display: flex;
+                            flex-direction: column;
+                        }
+                        .name-card-upper {
+                            flex: 1;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            transform: rotate(180deg);
+                            font-size: 96px;
+                            font-weight: bold;
+                            color: white;
+                        }
+                        .name-card-lower {
+                             flex: 1;
+                             display: flex;
+                             align-items: center;
+                             justify-content: center;
+                             margin-top: 40px;
+                             font-size: 96px;
+                             font-weight: bold;
+                             color: white;
+                         }
+                         .title-container {
+                             height: 25%;
+                             position: absolute;
+                             top: 33%;
+                             left: 51%;
+                             transform: translate(-50%, 0%);
+                             width: 68%;
+                             display: flex;
+                             flex-direction: column;
+                             justify-content: space-between;
+                             z-index: 6;
+                         }
+                         .title-card-upper {
+                             text-align: left;
+                             transform: rotate(180deg);
+                             font-size: 6cqw;
+                             color: white;
+                             font-weight: bold;
+                         }
+                         .title-card-lower {
+                             text-align: right;
+                             font-size: 6cqw;
+                             color: white;
+                             font-weight: bold;
+                         }
+                         .title-upper-box {
+                             width: 43%;
+                             text-align: center;
+                             white-space: nowrap;
+                             overflow: hidden;
+                             margin-bottom: 5%;
+                             margin-left: -2%;
+                         }
+                         .title-lower-box {
+                             width: 43%;
+                             text-align: center;
+                             white-space: nowrap;
+                             overflow: hidden;
+                             margin-bottom: 5%;
+                         }
+                    </style>
+                </head>
+                <body>
+            `;
+            
+            generatedNames.forEach((name, index) => {
+                const titleInput = document.getElementById('title').value;
+                
+                // 计算动态字体大小（基于A4纸张宽度约800px）
+                const a4Width = 800;
+                const titleBoxWidth = a4Width * 0.68 * 0.43; // 容器宽度 * 盒子宽度比例
+                const maxFontSize = (16 / 100) * a4Width; // 16cqw转换为像素
+                const availableWidth = titleBoxWidth * 0.8; // 80%可用宽度
+                
+                // 如果文字长度小于5，使用5来计算，确保最小字体大小
+                const textLength = Math.max(titleInput.length, 5);
+                const calculatedFontSize = titleInput ? availableWidth / textLength : 48;
+                const finalFontSize = Math.max(24, Math.min(maxFontSize, calculatedFontSize));
+                
+                printContent += `
+                    <div class="name-card ${index < generatedNames.length - 1 ? 'page-break' : ''}">
+                        <div class="names-container">
+                            <div class="name-card-upper">${name}</div>
+                            <div class="name-card-lower">${name}</div>
+                        </div>
+                        ${titleInput.trim() ? `
+                        <div class="title-container">
+                            <div class="title-card-upper">
+                                <div class="title-upper-box" style="font-size: ${finalFontSize}px;">${titleInput}</div>
+                            </div>
+                            <div class="title-card-lower">
+                                <div class="title-lower-box" style="font-size: ${finalFontSize}px;">${titleInput}</div>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+            
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            document.body.appendChild(iframe);
+            
+            const doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(printContent);
+            doc.close();
+            
+            // 等待内容和图片加载
+            iframe.contentWindow.onload = function() {
+                setTimeout(() => {
+                    iframe.contentWindow.print();
+                    // 打印后移除iframe
+                    setTimeout(() => {
+                        document.body.removeChild(iframe);
+                    }, 100);
+                }, 500);
+            };
+        }
+        // 页面加载时生成示例
+        window.onload = function() {
+            autoGenerateNameCards();
+        };
+    </script>
+</body>
+</html>
