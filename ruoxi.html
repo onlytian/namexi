@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>人名牌制作器</title>
-    <!-- 使用线上CDN库文件 -->
+    <!-- 添加jsPDF和html2canvas库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
@@ -105,9 +105,8 @@
             justify-content: center;
             transform: rotate(180deg);
             padding: 20px 20px;
+            font-size:16cqw;
             color: white;
-            font-size: 16cqw; /* 默认字体大小 */
-            font-weight: bold;
         }
         .name-card-lower {
             flex: 1;
@@ -115,9 +114,8 @@
             align-items: center;
             justify-content: center;
             padding: 20px 20px;
+            font-size: 16cqw;
             color: white;
-            font-size: 16cqw; /* 默认字体大小 */
-            font-weight: bold;
         }
         .name-card {
             container-type: inline-size;
@@ -345,7 +343,6 @@
                         <option value="print">使用打印功能</option>
                     </select>
                     <button class="print-btn" onclick="exportPDF()" id="exportBtn">导出为PDF</button>
-                    <button class="print-btn" onclick="testPDFExport()" style="background-color: #ffc107; margin-left: 10px;">测试导出</button>
                 </div>
             </div>
             <div id="nameGrid" class="name-grid"></div>
@@ -370,8 +367,6 @@
         let currentTag = 'manager';
         let generatedNames = [];
         
-
-        
         function selectTitle(title) {
             const titleInput = document.getElementById('title');
             titleInput.value = title;
@@ -379,6 +374,42 @@
             autoGenerateNameCards(); // 选择标题后自动生成
         }
         
+        // 计算字符实际长度：中文字符占2个，英文字符占1个
+        function getCharacterLength(text) {
+            let length = 0;
+            for (let i = 0; i < text.length; i++) {
+                const charCode = text.charCodeAt(i);
+                // 中文字符范围：\u4e00-\u9fff
+                if (charCode >= 0x4e00 && charCode <= 0x9fff) {
+                    length += 2;
+                } else {
+                    length += 1;
+                }
+            }
+            return length;
+        }
+
+        function adjustNameFontSize(nameElement, text) {
+            // 计算实际字符长度
+            const actualLength = getCharacterLength(text);
+            
+            // 基础字体大小为16cqw，2-3个中文字符时使用最大字体
+            let fontSizeCqw = 16;
+            
+            if (actualLength > 6) {
+                // 超过6个字符时，每多2个字符就减少1cqw
+                const extraChars = actualLength - 6;
+                const reduction = Math.floor(extraChars / 2);
+                fontSizeCqw = Math.max(6, 16 - reduction); // 最小不小于6cqw
+            }
+            
+            // 使用cqw单位设置字体大小
+            nameElement.style.setProperty('font-size', fontSizeCqw + 'cqw', 'important');
+            
+            // 添加调试信息
+            console.log(`文字: "${text}", 实际长度: ${actualLength}, cqw: ${fontSizeCqw}`);
+        }
+
         function adjustTitleBoxFontSize(box, text) {
             // 获取盒子的实际宽度
             const boxWidth = box.offsetWidth;
@@ -401,57 +432,6 @@
             
             box.style.fontSize = fontSize + 'px';
         }
-        
-        // 计算字符实际长度：中文字符占2个，英文字符占1个
-        function getCharacterLength(text) {
-            let length = 0;
-            for (let i = 0; i < text.length; i++) {
-                const charCode = text.charCodeAt(i);
-                // 中文字符范围：\u4e00-\u9fff
-                if (charCode >= 0x4e00 && charCode <= 0x9fff) {
-                    length += 2;
-                } else {
-                    length += 1;
-                }
-            }
-            return length;
-        }
-        
-        function adjustNameFontSize(nameElement, text) {
-            // 获取名字容器的实际宽度
-            const containerWidth = nameElement.closest('.name-card').offsetWidth;
-            
-            // 计算实际字符长度
-            const actualLength = getCharacterLength(text);
-            
-            // 基础字体大小为16cqw，每多2个字符减少1cqw
-            let fontSizeCqw = 16;
-            if (actualLength > 6) {
-                // 计算需要减少的cqw数量
-                const extraChars = actualLength - 6;
-                const reduction = Math.floor(extraChars / 2);
-                fontSizeCqw = Math.max(6, 16 - reduction); // 最小不小于6cqw
-            }
-            
-            // 转换为像素值
-            const fontSizePx = (fontSizeCqw / 100) * containerWidth;
-            
-            // 使用!important确保字体大小被应用
-            nameElement.style.setProperty('font-size', fontSizePx + 'px', 'important');
-            
-            // 备选方案：直接使用cqw单位
-            nameElement.style.setProperty('font-size', fontSizeCqw + 'cqw', 'important');
-            
-            // 添加调试信息
-            console.log(`文字: "${text}", 实际长度: ${actualLength}, cqw: ${fontSizeCqw}, 像素: ${fontSizePx}px, 容器宽度: ${containerWidth}px`);
-            
-            // 验证字体大小是否被设置
-            setTimeout(() => {
-                const computedFontSize = window.getComputedStyle(nameElement).fontSize;
-                console.log(`实际应用的字体大小: ${computedFontSize}`);
-            }, 100);
-        }
-        
         function max(a,b) {
             return a>b? a:b
         }
@@ -469,7 +449,9 @@
         
         function updateCardBackgrounds() {
             const nameCards = document.querySelectorAll('.name-card');
-            const backgroundImage = 'url("./js/manager.png")';
+            const backgroundImage = currentTag === 'manager' 
+                ? 'url("./js/manager.png")'
+                : 'url("./js/manager.png")';
             
             nameCards.forEach(card => {
                 card.style.backgroundImage = backgroundImage;
@@ -530,6 +512,7 @@
                         adjustNameFontSize(upperPart, name);
                         adjustNameFontSize(lowerPart, name);
                     }, 0);
+                    
                     // 如果有课程名称，创建课程名称容器
                     if (titleInput.trim()) {
                         const titleContainer = document.createElement('div');
@@ -595,8 +578,6 @@
             exportBtn.disabled = true;
             progressOverlay.style.display = 'flex';
             
-
-            
             try {
                 const { jsPDF } = window.jspdf;
                 const pdfContainer = document.getElementById('pdfContainer');
@@ -628,34 +609,20 @@
                                 const availableWidth = boxWidth * 0.8;
                                 const textLength = Math.max(text.length, 5);
                                 const calculatedFontSize = availableWidth / textLength;
-                                const fontSize = Math.max(12, Math.min(maxFontSizeCqw, calculatedFontSize));
+                                const fontSize = Math.max(12, Math.min(maxFontSizePx, calculatedFontSize));
                                 box.style.fontSize = fontSize + 'px';
                             }
                         });
                         
-                        // 确保名字字体大小也正确设置
-                        const nameElements = clonedCard.querySelectorAll('.name-card-upper, .name-card-lower');
-                        nameElements.forEach(nameElement => {
-                            const name = nameElement.textContent;
-                            if (name) {
-                                adjustNameFontSize(nameElement, name);
-                            }
-                        });
-                        
                         // 等待渲染
-                        await new Promise(resolve => setTimeout(resolve, 200));
+                        await new Promise(resolve => setTimeout(resolve, 100));
                         
                         // 生成canvas
                         const canvas = await html2canvas(pdfContainer, {
                             scale: 2,
                             useCORS: true,
                             allowTaint: true,
-                            logging: true,
-                            backgroundColor: '#ffffff',
-                            width: 794,
-                            height: 1123,
-                            scrollX: 0,
-                            scrollY: 0
+                            logging: false
                         });
                         
                         // 创建PDF
@@ -697,34 +664,20 @@
                                 const availableWidth = boxWidth * 0.8;
                                 const textLength = Math.max(text.length, 5);
                                 const calculatedFontSize = availableWidth / textLength;
-                                const fontSize = Math.max(12, Math.min(maxFontSizeCqw, calculatedFontSize));
+                                const fontSize = Math.max(12, Math.min(maxFontSizePx, calculatedFontSize));
                                 box.style.fontSize = fontSize + 'px';
                             }
                         });
                         
-                        // 确保名字字体大小也正确设置
-                        const nameElements = clonedCard.querySelectorAll('.name-card-upper, .name-card-lower');
-                        nameElements.forEach(nameElement => {
-                            const name = nameElement.textContent;
-                            if (name) {
-                                adjustNameFontSize(nameElement, name);
-                            }
-                        });
-                        
                         // 等待渲染
-                        await new Promise(resolve => setTimeout(resolve, 200));
+                        await new Promise(resolve => setTimeout(resolve, 100));
                         
                         // 生成canvas
                         const canvas = await html2canvas(pdfContainer, {
                             scale: 2,
                             useCORS: true,
                             allowTaint: true,
-                            logging: true,
-                            backgroundColor: '#ffffff',
-                            width: 794,
-                            height: 1123,
-                            scrollX: 0,
-                            scrollY: 0
+                            logging: false
                         });
                         
                         const imgData = canvas.toDataURL('image/jpeg', 0.95);
@@ -763,7 +716,9 @@
                 return;
             }
             
-            const backgroundImage = './js/manager.png';
+            const backgroundImage = currentTag === 'manager' 
+                ? 'https://test-biubiubiu.oss-cn-shenzhen.aliyuncs.com/manager.jpg'
+                : 'https://test-biubiubiu.oss-cn-shenzhen.aliyuncs.com/talent.jpg';
             
             // 创建打印内容
             let printContent = `
@@ -820,6 +775,7 @@
                             align-items: center;
                             justify-content: center;
                             transform: rotate(180deg);
+                            font-size: 96px;
                             font-weight: bold;
                             color: white;
                         }
@@ -829,6 +785,7 @@
                              align-items: center;
                              justify-content: center;
                              margin-top: 40px;
+                             font-size: 96px;
                              font-weight: bold;
                              color: white;
                          }
@@ -880,24 +837,8 @@
             generatedNames.forEach((name, index) => {
                 const titleInput = document.getElementById('title').value;
                 
-                // 计算名字字体大小
-                let nameFontSize;
-                const nameActualLength = getCharacterLength(name);
-                
-                // 基础字体大小为16cqw，每多2个字符减少1cqw
-                let nameFontSizeCqw = 16;
-                if (nameActualLength > 6) {
-                    // 计算需要减少的cqw数量
-                    const extraChars = nameActualLength - 6;
-                    const reduction = Math.floor(extraChars / 2);
-                    nameFontSizeCqw = Math.max(6, 16 - reduction); // 最小不小于6cqw
-                }
-                
-                // 转换为像素值（基于A4纸张宽度约800px）
+                // 计算动态字体大小（基于A4纸张宽度约800px）
                 const a4Width = 800;
-                nameFontSize = (nameFontSizeCqw / 100) * a4Width;
-                
-                // 计算课程名称字体大小（基于A4纸张宽度约800px）
                 const titleBoxWidth = a4Width * 0.68 * 0.43; // 容器宽度 * 盒子宽度比例
                 const maxFontSize = (16 / 100) * a4Width; // 16cqw转换为像素
                 const availableWidth = titleBoxWidth * 0.8; // 80%可用宽度
@@ -910,8 +851,8 @@
                 printContent += `
                     <div class="name-card ${index < generatedNames.length - 1 ? 'page-break' : ''}">
                         <div class="names-container">
-                            <div class="name-card-upper" style="font-size: ${nameFontSize}px;">${name}</div>
-                            <div class="name-card-lower" style="font-size: ${nameFontSize}px;">${name}</div>
+                            <div class="name-card-upper">${name}</div>
+                            <div class="name-card-lower">${name}</div>
                         </div>
                         ${titleInput.trim() ? `
                         <div class="title-container">
@@ -952,34 +893,11 @@
                 }, 500);
             };
         }
-        // 添加测试PDF导出功能
-        function testPDFExport() {
-            console.log('开始测试PDF导出...');
-            
-            // 检查库是否加载
-            if (typeof window.jspdf === 'undefined') {
-                console.error('jsPDF库未加载！');
-                alert('jsPDF库未加载，请检查网络连接或本地库文件');
-                return;
-            }
-            
-            if (typeof window.html2canvas === 'undefined') {
-                console.error('html2canvas库未加载！');
-                alert('html2canvas库未加载，请检查网络连接或本地库文件');
-                return;
-            }
-            
-            console.log('库加载正常，开始导出测试...');
-            
-            // 测试导出
-            exportPDF();
-        }
-        
         // 页面加载时生成示例
         window.onload = function() {
-            // 生成示例卡片
             autoGenerateNameCards();
         };
+        
     </script>
 </body>
 </html>
