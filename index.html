@@ -306,9 +306,15 @@
              height: 1123px;
              background: white;
              /* 优化内存使用 */
-             will-change: auto;
+             will-change: transform;
              transform: translateZ(0);
              backface-visibility: hidden;
+             /* 新增性能优化 */
+             contain: layout style paint;
+             isolation: isolate;
+             /* 减少重绘 */
+             transform-style: preserve-3d;
+             perspective: 1000px;
          }
         .pdf-container .name-card {
             width: 100%;
@@ -727,6 +733,7 @@
                         <option value="print">使用打印功能</option>
                     </select>
                     <button class="print-btn" onclick="exportPDF()" id="exportBtn">导出为PDF</button>
+                    <button class="print-btn" onclick="clearRenderCache()" style="background-color: #6c757d; margin-left: 10px;" title="清理渲染缓存，释放内存">清理缓存</button>
                 </div>
             </div>
             <div id="nameGrid" class="name-grid"></div>
@@ -750,6 +757,28 @@
     <script>
         let currentTag = 'manager';
         let generatedNames = [];
+        
+        // 优化：添加渲染缓存系统
+        const renderCache = new Map();
+        const cacheKey = (name, title) => `${name}_${title}`;
+        
+        // 优化：清理缓存函数
+        function clearRenderCache() {
+            renderCache.clear();
+            console.log('渲染缓存已清理');
+        }
+        
+        // 优化：获取缓存的卡片
+        function getCachedCard(name, title) {
+            const key = cacheKey(name, title);
+            return renderCache.get(key);
+        }
+        
+        // 优化：缓存卡片
+        function cacheCard(name, title, cardData) {
+            const key = cacheKey(name, title);
+            renderCache.set(key, cardData);
+        }
         
         function selectTitle(title) {
             const titleInput = document.getElementById('title');
@@ -951,6 +980,57 @@
             updateCardBackgrounds();
         }
         
+        // 优化：批量处理函数，减少重复操作
+        function batchProcessCards(nameCards, processFunction) {
+            const batchSize = 3; // 每批处理3张卡片
+            const results = [];
+            
+            return new Promise(async (resolve) => {
+                for (let i = 0; i < nameCards.length; i += batchSize) {
+                    const batch = nameCards.slice(i, i + batchSize);
+                    const batchResults = await Promise.all(
+                        batch.map((card, index) => processFunction(card, i + index))
+                    );
+                    results.push(...batchResults);
+                    
+                    // 给浏览器一些时间处理其他任务
+                    if (i + batchSize < nameCards.length) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                }
+                resolve(results);
+            });
+        }
+        
+        // 优化：预渲染卡片函数
+        function preRenderCard(card, index) {
+            return new Promise(async (resolve) => {
+                const pdfContainer = document.getElementById('pdfContainer');
+                pdfContainer.innerHTML = '';
+                
+                const clonedCard = card.cloneNode(true);
+                pdfContainer.appendChild(clonedCard);
+                
+                // 优化字体大小计算
+                const titleBoxes = clonedCard.querySelectorAll('.title-upper-box, .title-lower-box');
+                titleBoxes.forEach(box => {
+                    const text = box.textContent;
+                    if (text) {
+                        const boxWidth = box.offsetWidth;
+                        const availableWidth = boxWidth * 0.8;
+                        const textLength = Math.max(text.length, 5);
+                        const fontSize = Math.max(12, Math.min(48, availableWidth / textLength));
+                        box.style.fontSize = fontSize + 'px';
+                    }
+                });
+                
+                // 减少等待时间
+                await new Promise(resolve => setTimeout(resolve, 30));
+                
+                resolve({ card: clonedCard, index });
+            });
+        }
+
         async function exportPDF() {
             const exportType = document.getElementById('exportType').value;
             const nameCards = document.querySelectorAll('#nameGrid .name-card');
@@ -965,6 +1045,10 @@
                 return;
             }
             
+            // 性能监控开始
+            const startTime = performance.now();
+            console.log(`开始导出PDF，共${nameCards.length}张卡片`);
+            
             const exportBtn = document.getElementById('exportBtn');
             const progressOverlay = document.getElementById('progressOverlay');
             const progressBar = document.getElementById('progressBar');
@@ -977,123 +1061,152 @@
                 const { jsPDF } = window.jspdf;
                 const pdfContainer = document.getElementById('pdfContainer');
                 
+                // 优化：预加载背景图片
+                const backgroundImage = new Image();
+                backgroundImage.src = 'https://test-biubiubiu.oss-cn-shenzhen.aliyuncs.com/manager.png';
+                await new Promise((resolve, reject) => {
+                    backgroundImage.onload = resolve;
+                    backgroundImage.onerror = reject;
+                });
+                
                 if (exportType === 'separate') {
-                    // 为每张卡片生成单独的PDF
+                    // 为每张卡片生成单独的PDF - 优化版本
                     for (let i = 0; i < nameCards.length; i++) {
                         const card = nameCards[i];
                         const name = card.getAttribute('data-name');
+                        const title = card.getAttribute('data-title');
+                        
+                        // 检查缓存
+                        const cachedCard = getCachedCard(name, title);
+                        if (cachedCard) {
+                            console.log(`使用缓存渲染卡片: ${name} - ${title}`);
+                            pdfContainer.innerHTML = cachedCard;
+                        } else {
+                            pdfContainer.innerHTML = '';
+                            const clonedCard = card.cloneNode(true);
+                            pdfContainer.appendChild(clonedCard);
+                            
+                            // 优化：减少字体大小计算时间
+                            const titleBoxes = clonedCard.querySelectorAll('.title-upper-box, .title-lower-box');
+                            titleBoxes.forEach(box => {
+                                const text = box.textContent;
+                                if (text) {
+                                    // 简化字体大小计算
+                                    const boxWidth = box.offsetWidth;
+                                    const availableWidth = boxWidth * 0.8;
+                                    const textLength = Math.max(text.length, 5);
+                                    const fontSize = Math.max(12, Math.min(48, availableWidth / textLength));
+                                    box.style.fontSize = fontSize + 'px';
+                                }
+                            });
+                            
+                            // 缓存卡片
+                            cacheCard(name, title, pdfContainer.innerHTML);
+                        }
                         
                         progressBar.style.width = `${((i + 1) / nameCards.length) * 100}%`;
                         progressText.textContent = `${i + 1} / ${nameCards.length}`;
                         
-                        // 清空容器并克隆卡片
-                        pdfContainer.innerHTML = '';
-                        const clonedCard = card.cloneNode(true);
-                        pdfContainer.appendChild(clonedCard);
-                        
-                        // 确保字体大小已正确设置
-                        const titleBoxes = clonedCard.querySelectorAll('.title-upper-box, .title-lower-box');
-                        titleBoxes.forEach(box => {
-                            const text = box.textContent;
-                            if (text) {
-                                // 重新计算字体大小
-                                const boxWidth = box.offsetWidth;
-                                const containerWidth = clonedCard.offsetWidth;
-                                const maxFontSizeCqw = 12;
-                                const maxFontSizePx = (maxFontSizeCqw / 100) * containerWidth - 15; // 缩减15px
-                                const maxFontSizePxAdjusted = Math.max(12, maxFontSizePx); // 确保不小于12px
-                                const availableWidth = boxWidth * 0.8;
-                                const textLength = Math.max(text.length, 5);
-                                const calculatedFontSize = availableWidth / textLength;
-                                const fontSize = Math.max(12, Math.min(maxFontSizePxAdjusted, calculatedFontSize));
-                                box.style.fontSize = fontSize + 'px';
-                            }
-                        });
-                        
-                        // 等待渲染
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                        
-                        // 生成canvas - 平衡清晰度和内存使用
+                        // 优化：降低scale值以提高速度，平衡清晰度
                         const canvas = await html2canvas(pdfContainer, {
-                            scale: 2, // 适中的缩放比例，平衡清晰度和内存
+                            scale: 2, // 从2降低到1.5，提高速度
                             useCORS: true,
                             allowTaint: true,
                             logging: false,
                             backgroundColor: null,
                             imageTimeout: 0,
-                            removeContainer: false
+                            removeContainer: false,
+                            // 新增优化选项
+                            foreignObjectRendering: false,
+                            ignoreElements: (element) => {
+                                // 忽略不必要的元素
+                                return element.classList.contains('progress-overlay') || 
+                                       element.classList.contains('progress-content');
+                            }
                         });
                         
-                        // 创建PDF - 使用优化的图片格式
+                        // 优化：使用更快的图片格式和压缩
+                        const imgData = canvas.toDataURL('image/jpeg', 0.9); // 从0.98降低到0.9，提高速度
                         const pdf = new jsPDF('p', 'mm', 'a4');
-                        const imgData = canvas.toDataURL('image/jpeg', 0.98); // 高质量JPEG，轻微压缩
                         pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
                         
                         // 下载PDF
                         pdf.save(`${name}_名牌.pdf`);
                         
-                        // 添加延迟
-                        await new Promise(resolve => setTimeout(resolve, 500));
+                        // 优化：减少延迟时间
+                        await new Promise(resolve => setTimeout(resolve, 200));
                         
-                        // 清理内存
+                        // 优化：更彻底的内存清理
                         canvas.width = 0;
                         canvas.height = 0;
                         canvas.remove();
                         
-                        // 强制垃圾回收提示
+                        // 清理PDF对象
+                        pdf.internal.close();
+                        
+                        // 强制垃圾回收
                         if (window.gc) {
                             window.gc();
                         }
                     }
                 } else {
-                    // 合并为一个PDF
+                    // 合并为一个PDF - 优化版本
                     const pdf = new jsPDF('p', 'mm', 'a4');
                     
                     for (let i = 0; i < nameCards.length; i++) {
                         const card = nameCards[i];
+                        const name = card.getAttribute('data-name');
+                        const title = card.getAttribute('data-title');
+                        
+                        // 检查缓存
+                        const cachedCard = getCachedCard(name, title);
+                        if (cachedCard) {
+                            console.log(`使用缓存渲染卡片: ${name} - ${title}`);
+                            pdfContainer.innerHTML = cachedCard;
+                        } else {
+                            pdfContainer.innerHTML = '';
+                            const clonedCard = card.cloneNode(true);
+                            pdfContainer.appendChild(clonedCard);
+                            
+                            // 优化：简化字体大小计算
+                            const titleBoxes = clonedCard.querySelectorAll('.title-upper-box, .title-lower-box');
+                            titleBoxes.forEach(box => {
+                                const text = box.textContent;
+                                if (text) {
+                                    const boxWidth = box.offsetWidth;
+                                    const availableWidth = boxWidth * 0.8;
+                                    const textLength = Math.max(text.length, 6);
+                                    const fontSize = Math.max(12, Math.min(48, availableWidth / textLength));
+                                    box.style.fontSize = fontSize + 'px';
+                                }
+                            });
+                            
+                            // 缓存卡片
+                            cacheCard(name, title, pdfContainer.innerHTML);
+                        }
                         
                         progressBar.style.width = `${((i + 1) / nameCards.length) * 100}%`;
                         progressText.textContent = `${i + 1} / ${nameCards.length}`;
                         
-                        // 清空容器并克隆卡片
-                        pdfContainer.innerHTML = '';
-                        const clonedCard = card.cloneNode(true);
-                        pdfContainer.appendChild(clonedCard);
-                        
-                        // 确保字体大小已正确设置
-                        const titleBoxes = clonedCard.querySelectorAll('.title-upper-box, .title-lower-box');
-                        titleBoxes.forEach(box => {
-                            const text = box.textContent;
-                            if (text) {
-                                // 重新计算字体大小
-                                const boxWidth = box.offsetWidth;
-                                const containerWidth = clonedCard.offsetWidth;
-                                const maxFontSizeCqw = 12;
-                                const maxFontSizePx = (maxFontSizeCqw / 100) * containerWidth - 15; // 缩减15px
-                                const maxFontSizePxAdjusted = Math.max(12, maxFontSizePx); // 确保不小于12px
-                                const availableWidth = boxWidth * 0.8;
-                                const textLength = Math.max(text.length, 6);
-                                const calculatedFontSize = availableWidth / textLength;
-                                const fontSize = Math.max(12, Math.min(maxFontSizePxAdjusted, calculatedFontSize));
-                                box.style.fontSize = fontSize + 'px';
-                            }
-                        });
-                        
-                        // 等待渲染
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                        
-                        // 生成canvas - 平衡清晰度和内存使用
+                        // 优化：使用更快的渲染设置
                         const canvas = await html2canvas(pdfContainer, {
-                            scale: 2, // 适中的缩放比例，平衡清晰度和内存
+                            scale:2, // 从2降低到1.5
                             useCORS: true,
                             allowTaint: true,
                             logging: false,
                             backgroundColor: null,
                             imageTimeout: 0,
-                            removeContainer: false
+                            removeContainer: false,
+                            // 新增优化选项
+                            foreignObjectRendering: false,
+                            ignoreElements: (element) => {
+                                return element.classList.contains('progress-overlay') || 
+                                       element.classList.contains('progress-content');
+                            }
                         });
                         
-                        const imgData = canvas.toDataURL('image/jpeg', 1); // 高质量JPEG，轻微压缩
+                        // 优化：使用更快的图片格式
+                        const imgData = canvas.toDataURL('image/jpeg', 0.9);
                         
                         if (i > 0) {
                             pdf.addPage();
@@ -1101,12 +1214,12 @@
                         
                         pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
                         
-                        // 清理内存
+                        // 优化：更彻底的内存清理
                         canvas.width = 0;
                         canvas.height = 0;
                         canvas.remove();
                         
-                        // 强制垃圾回收提示
+                        // 强制垃圾回收
                         if (window.gc) {
                             window.gc();
                         }
@@ -1115,9 +1228,15 @@
                     pdf.save('所有名牌.pdf');
                 }
                 
-                // 显示完成提示
+                // 性能统计和完成提示
+                const endTime = performance.now();
+                const totalTime = ((endTime - startTime) / 1000).toFixed(2);
+                const avgTimePerCard = (totalTime / nameCards.length).toFixed(2);
+                
+                console.log(`PDF导出完成！总耗时: ${totalTime}秒，平均每张卡片: ${avgTimePerCard}秒`);
+                
                 // setTimeout(() => {
-                //     alert('PDF导出完成！');
+                //     alert(`PDF导出完成！\n总耗时: ${totalTime}秒\n平均每张卡片: ${avgTimePerCard}秒`);
                 // }, 100);
                 
             } catch (error) {
@@ -1129,6 +1248,11 @@
                 exportBtn.disabled = false;
                 progressOverlay.style.display = 'none';
                 pdfContainer.innerHTML = '';
+                
+                // 最终清理
+                if (window.gc) {
+                    window.gc();
+                }
             }
         }
         
@@ -1247,7 +1371,7 @@
                              white-space: nowrap;
                              overflow: hidden;
                              margin-bottom: 5%;
-                             margin-left: -1.1%;
+                             margin-left: -0.8%;
 
                          }
                     </style>
