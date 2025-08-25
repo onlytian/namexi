@@ -87,10 +87,6 @@
             gap: 20px;
         }
         .name-card {
-            background-image: url('https://test-biubiubiu.oss-cn-shenzhen.aliyuncs.com/manager.png');
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
             color: white;
             padding: 0;
             text-align: center;
@@ -101,6 +97,17 @@
             display: flex;
             flex-direction: column;
             position: relative;
+            overflow: hidden;
+        }
+        
+        .name-card-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
         }
         .name-card-upper {
             flex: 1;
@@ -134,7 +141,7 @@
             height: 62%;
             display: flex;
             flex-direction: column;
-            z-index: 5;
+            z-index: 10;
             container-type: inline-size;
         }
         .title-container {
@@ -148,7 +155,7 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            z-index: 6;
+            z-index: 10;
             
         }
         .title-card-upper {
@@ -184,7 +191,7 @@
             white-space: nowrap;
             overflow: hidden;
             margin-bottom: 4.3%;
-            margin-left: -0.3%;
+            margin-left: -1.1%;
         }
         .tag-container {
             display: flex;
@@ -291,14 +298,18 @@
             transition: width 0.3s;
             width: 0%;
         }
-        /* A4大小的隐藏容器 */
-        .pdf-container {
-            position: fixed;
-            left: -9999px;
-            width: 794px;
-            height: 1123px;
-            background: white;
-        }
+                 /* A4大小的隐藏容器 - 优化内存使用 */
+         .pdf-container {
+             position: fixed;
+             left: -9999px;
+             width: 794px;
+             height: 1123px;
+             background: white;
+             /* 优化内存使用 */
+             will-change: auto;
+             transform: translateZ(0);
+             backface-visibility: hidden;
+         }
         .pdf-container .name-card {
             width: 100%;
             height: 100%;
@@ -790,9 +801,10 @@
             // 计算容器宽度（用于cqw单位计算）
             const containerWidth = box.closest('.name-card').offsetWidth;
             
-            // 最大字体大小为16cqw，转换为像素值
+            // 最大字体大小为16cqw，转换为像素值，缩减15px
             const maxFontSizeCqw = 16;
-            const maxFontSizePx = (maxFontSizeCqw / 100) * containerWidth;
+            const maxFontSizePx = (maxFontSizeCqw / 100) * containerWidth - 15;
+            const maxFontSizePxAdjusted = Math.max(12, maxFontSizePx); // 确保不小于12px
             
             // 可用宽度为盒子宽度的80%
             const availableWidth = boxWidth * 0.8;
@@ -801,7 +813,7 @@
             const calculatedFontSize = availableWidth / max(text.length,5);
             
             // 取较小值，但不小于12px
-            const fontSize = Math.max(12, Math.min(maxFontSizePx, calculatedFontSize));
+            const fontSize = Math.max(12, Math.min(maxFontSizePxAdjusted, calculatedFontSize));
             
             box.style.fontSize = fontSize + 'px';
         }
@@ -820,16 +832,19 @@
             updateCardBackgrounds();
         }
         
-        function updateCardBackgrounds() {
-            const nameCards = document.querySelectorAll('.name-card');
-            const backgroundImage = currentTag === 'manager' 
-                ? 'url("https://test-biubiubiu.oss-cn-shenzhen.aliyuncs.com/manager.png")'
-                : 'url("https://test-biubiubiu.oss-cn-shenzhen.aliyuncs.com/manager.png")';
-            
-            nameCards.forEach(card => {
-                card.style.backgroundImage = backgroundImage;
-            });
-        }
+                 function updateCardBackgrounds() {
+             const nameCards = document.querySelectorAll('.name-card');
+             const backgroundImageUrl = currentTag === 'manager' 
+                 ? 'https://test-biubiubiu.oss-cn-shenzhen.aliyuncs.com/manager.png'
+                 : 'https://test-biubiubiu.oss-cn-shenzhen.aliyuncs.com/manager.png';
+             
+             nameCards.forEach(card => {
+                 const backgroundImg = card.querySelector('.name-card-background');
+                 if (backgroundImg) {
+                     backgroundImg.src = backgroundImageUrl;
+                 }
+             });
+         }
         
         function autoGenerateNameCards() {
             // 防抖处理，避免频繁生成
@@ -858,14 +873,21 @@
             
             const nameCards = names.map(name => {
                 if (name) {
-                    const nameCard = document.createElement('div');
-                    nameCard.className = 'name-card';
-                    nameCard.setAttribute('data-name', name);
-                    nameCard.setAttribute('data-title', titleInput);
-                    
-                    // 创建名字容器
-                    const namesContainer = document.createElement('div');
-                    namesContainer.className = 'names-container';
+                                         const nameCard = document.createElement('div');
+                     nameCard.className = 'name-card';
+                     nameCard.setAttribute('data-name', name);
+                     nameCard.setAttribute('data-title', titleInput);
+                     
+                     // 创建背景图片
+                     const backgroundImg = document.createElement('img');
+                     backgroundImg.className = 'name-card-background';
+                     backgroundImg.src = 'https://test-biubiubiu.oss-cn-shenzhen.aliyuncs.com/manager.png';
+                     backgroundImg.alt = '背景图片';
+                     nameCard.appendChild(backgroundImg);
+                     
+                     // 创建名字容器
+                     const namesContainer = document.createElement('div');
+                     namesContainer.className = 'names-container';
                     
                     const upperPart = document.createElement('div');
                     upperPart.className = 'name-card-upper';
@@ -977,12 +999,13 @@
                                 // 重新计算字体大小
                                 const boxWidth = box.offsetWidth;
                                 const containerWidth = clonedCard.offsetWidth;
-                                const maxFontSizeCqw = 16;
-                                const maxFontSizePx = (maxFontSizeCqw / 100) * containerWidth;
+                                const maxFontSizeCqw = 12;
+                                const maxFontSizePx = (maxFontSizeCqw / 100) * containerWidth - 15; // 缩减15px
+                                const maxFontSizePxAdjusted = Math.max(12, maxFontSizePx); // 确保不小于12px
                                 const availableWidth = boxWidth * 0.8;
                                 const textLength = Math.max(text.length, 5);
                                 const calculatedFontSize = availableWidth / textLength;
-                                const fontSize = Math.max(12, Math.min(maxFontSizePx, calculatedFontSize));
+                                const fontSize = Math.max(12, Math.min(maxFontSizePxAdjusted, calculatedFontSize));
                                 box.style.fontSize = fontSize + 'px';
                             }
                         });
@@ -990,17 +1013,20 @@
                         // 等待渲染
                         await new Promise(resolve => setTimeout(resolve, 100));
                         
-                        // 生成canvas
+                        // 生成canvas - 平衡清晰度和内存使用
                         const canvas = await html2canvas(pdfContainer, {
-                            scale: 2,
+                            scale: 2, // 适中的缩放比例，平衡清晰度和内存
                             useCORS: true,
                             allowTaint: true,
-                            logging: false
+                            logging: false,
+                            backgroundColor: null,
+                            imageTimeout: 0,
+                            removeContainer: false
                         });
                         
-                        // 创建PDF
+                        // 创建PDF - 使用优化的图片格式
                         const pdf = new jsPDF('p', 'mm', 'a4');
-                        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                        const imgData = canvas.toDataURL('image/jpeg', 0.98); // 高质量JPEG，轻微压缩
                         pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
                         
                         // 下载PDF
@@ -1008,6 +1034,16 @@
                         
                         // 添加延迟
                         await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        // 清理内存
+                        canvas.width = 0;
+                        canvas.height = 0;
+                        canvas.remove();
+                        
+                        // 强制垃圾回收提示
+                        if (window.gc) {
+                            window.gc();
+                        }
                     }
                 } else {
                     // 合并为一个PDF
@@ -1032,12 +1068,13 @@
                                 // 重新计算字体大小
                                 const boxWidth = box.offsetWidth;
                                 const containerWidth = clonedCard.offsetWidth;
-                                const maxFontSizeCqw = 16;
-                                const maxFontSizePx = (maxFontSizeCqw / 100) * containerWidth;
+                                const maxFontSizeCqw = 12;
+                                const maxFontSizePx = (maxFontSizeCqw / 100) * containerWidth - 15; // 缩减15px
+                                const maxFontSizePxAdjusted = Math.max(12, maxFontSizePx); // 确保不小于12px
                                 const availableWidth = boxWidth * 0.8;
-                                const textLength = Math.max(text.length, 5);
+                                const textLength = Math.max(text.length, 6);
                                 const calculatedFontSize = availableWidth / textLength;
-                                const fontSize = Math.max(12, Math.min(maxFontSizePx, calculatedFontSize));
+                                const fontSize = Math.max(12, Math.min(maxFontSizePxAdjusted, calculatedFontSize));
                                 box.style.fontSize = fontSize + 'px';
                             }
                         });
@@ -1045,21 +1082,34 @@
                         // 等待渲染
                         await new Promise(resolve => setTimeout(resolve, 100));
                         
-                        // 生成canvas
+                        // 生成canvas - 平衡清晰度和内存使用
                         const canvas = await html2canvas(pdfContainer, {
-                            scale: 2,
+                            scale: 2, // 适中的缩放比例，平衡清晰度和内存
                             useCORS: true,
                             allowTaint: true,
-                            logging: false
+                            logging: false,
+                            backgroundColor: null,
+                            imageTimeout: 0,
+                            removeContainer: false
                         });
                         
-                        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                        const imgData = canvas.toDataURL('image/jpeg', 1); // 高质量JPEG，轻微压缩
                         
                         if (i > 0) {
                             pdf.addPage();
                         }
                         
                         pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+                        
+                        // 清理内存
+                        canvas.width = 0;
+                        canvas.height = 0;
+                        canvas.remove();
+                        
+                        // 强制垃圾回收提示
+                        if (window.gc) {
+                            window.gc();
+                        }
                     }
                     
                     pdf.save('所有名牌.pdf');
@@ -1089,9 +1139,9 @@
                 return;
             }
             
-            const backgroundImage = currentTag === 'manager' 
-                ? 'https://test-biubiubiu.oss-cn-shenzhen.aliyuncs.com/manager.jpg'
-                : 'https://test-biubiubiu.oss-cn-shenzhen.aliyuncs.com/talent.jpg';
+                         const backgroundImage = currentTag === 'manager' 
+                 ? 'https://test-biubiubiu.oss-cn-shenzhen.aliyuncs.com/manager.png'
+                 : 'https://test-biubiubiu.oss-cn-shenzhen.aliyuncs.com/manager.png';
             
             // 创建打印内容
             let printContent = `
@@ -1122,10 +1172,6 @@
                         .name-card {
                             width: 210mm;
                             height: 297mm;
-                            background-image: url('${backgroundImage}');
-                            background-size: cover;
-                            background-position: center;
-                            background-repeat: no-repeat;
                             position: relative;
                             display: flex;
                             flex-direction: column;
@@ -1201,7 +1247,7 @@
                              white-space: nowrap;
                              overflow: hidden;
                              margin-bottom: 5%;
-                             margin-left: -0.3%;
+                             margin-left: -1.1%;
 
                          }
                     </style>
@@ -1212,15 +1258,15 @@
             generatedNames.forEach((name, index) => {
                 const titleInput = document.getElementById('title').value;
                 
-                // 计算动态字体大小（基于A4纸张宽度约800px）
+                    // 计算动态字体大小（基于A4纸张宽度约800px）
                 const a4Width = 800;
                 const titleBoxWidth = a4Width * 0.68 * 0.43; // 容器宽度 * 盒子宽度比例
-                const maxFontSize = (16 / 100) * a4Width; // 16cqw转换为像素
+                const maxFontSize = (8 / 100) * a4Width - 15; // 16cqw转换为像素，缩减15px
                 const availableWidth = titleBoxWidth * 0.8; // 80%可用宽度
                 
                 // 如果文字长度小于5，使用5来计算，确保最小字体大小
-                const textLength = Math.max(titleInput.length, 5);
-                const calculatedFontSize = titleInput ? availableWidth / textLength : 48;
+                const textLength = Math.max(titleInput.length, 6);
+                const calculatedFontSize = titleInput ? availableWidth / textLength : 26;
                 const finalFontSize = Math.max(24, Math.min(maxFontSize, calculatedFontSize));
                 
                 printContent += `
