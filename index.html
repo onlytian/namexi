@@ -755,6 +755,16 @@
     <div id="pdfContainer" class="pdf-container"></div>
 
     <script>
+        // 检测 URL 中的 code 参数
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            
+            if (code) {
+                // 如果有 code 参数，跳转到 ruoxi.html 并传递 code
+                window.location.href = `ruoxi.html?code=${code}`;
+            }
+        }
         let currentTag = 'manager';
         let generatedNames = [];
         
