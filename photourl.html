@@ -5,35 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>图片预览</title>
     <style>
-       /* 重置默认样式 */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-/* body样式 */
-body {
-    margin: 0;
-    padding: 0;
-    overflow-x: hidden; /* 防止横向滚动 */
-}
-
-/* 图片样式 - 全宽自适应高度 */
-#photo {
-    width: 100vw;
-    height: auto;
-    display: block;
-    /* 可选：确保图片不变形 */
-    object-fit: contain;
-}
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        
+        #photo {
+            width: 100vw;
+            height: auto;
+            display: block;
+        }
     </style>
 </head>
 <body>
-    <div class="image-container">
-        <div class="loading" id="loading">加载中...</div>
-        <img id="photo" alt="预览图片" />
-    </div>
+    <img id="photo" alt="图片" />
 
     <script>
         // 获取URL参数
@@ -42,39 +27,17 @@ body {
             return urlParams.get(param);
         }
 
-        // 加载图片
-        function loadImage() {
-            const imageUrl = getQueryParam('url');
-            const img = document.getElementById('photo');
-            const loading = document.getElementById('loading');
-            const error = document.getElementById('error');
-
-            if (!imageUrl) {
-                loading.style.display = 'none';
-                error.textContent = '未提供图片URL';
-                error.style.display = 'block';
-                return;
-            }
-
-            // 解码URL（如果需要）
-            const decodedUrl = decodeURIComponent(imageUrl);
-
-            img.onload = function() {
-                loading.style.display = 'none';
-                img.style.display = 'block';
-            };
-
-            img.onerror = function() {
-                loading.style.display = 'none';
-                error.style.display = 'block';
-            };
-
-            // 设置图片源
-            img.src = decodedUrl;
+        // 设置标题
+        const title = getQueryParam('title');
+        if (title) {
+            document.title = decodeURIComponent(title);
         }
 
-        // 页面加载完成后执行
-        window.onload = loadImage;
+        // 设置图片
+        const imageUrl = getQueryParam('url');
+        if (imageUrl) {
+            document.getElementById('photo').src = decodeURIComponent(imageUrl);
+        }
     </script>
 </body>
 </html>
